@@ -6,6 +6,11 @@
 [build.environment]
   NODE_VERSION = "18"
 
+[functions]
+  # Maksymalny timeout dla funkcji (26 sekund dla Pro, 10 dla Free)
+  # Pro plan automatycznie użyje 26s
+  node_bundler = "esbuild"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

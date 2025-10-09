@@ -93,40 +93,37 @@ exports.handler = async (event, context) => {
     const genAI = new GoogleGenerativeAI(sanitizedApiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
 
-    // ETAP 1: Dekonstrukcja konkurenta z URL Context
-    const stage1Prompt = `Jesteś światowej klasy analitykiem SEO i content strategiem.
+    // Jednoetapowe generowanie mapy z URL Context (optymalizacja dla Netlify timeout)
+    const prompt = `Jesteś światowej klasy analitykiem SEO i content strategiem.
 
-ZADANIE: Przeanalizuj strukturę treści ze strony ${sanitizedUrl} i wyekstrahuj z niej strategiczną mapę tematyczną.
+ZADANIE: Przeanalizuj stronę ${sanitizedUrl} i stwórz kompleksową, strategiczną mapę tematyczną dla tematu "${sanitizedTopic}".
 
-GŁÓWNY TEMAT: "${sanitizedTopic}"
+INSTRUKCJE:
+1. Przeanalizuj zawartość i strukturę strony pod podanym URL
+2. Wyekstrahuj główne filary tematyczne (pillars) i klastry (clusters)
+3. Rozbuduj strukturę o dodatkowe obszary i podtematy, które mogą wzbogacić strategię contentową
+4. Dodaj kluczowe encje przy najważniejszych filarach (w nawiasach)
+5. Zapewnij logiczną hierarchię i kompletność
 
-WYMAGANIA ANALIZY:
-1. Przeanalizuj zawartość strony pod podanym URL
-2. Zidentyfikuj główne filary tematyczne (pillars) - kluczowe obszary tematyczne poruszane na stronie
-3. Dla każdego filaru wyodrębnij klastry (clusters) - szczegółowe podtematy
-4. Zachowaj hierarchię i strukturę logiczną
-5. Skup się na semantycznych relacjach między tematami
+FORMAT (zagnieżdżona lista Markdown):
+- Filar 1: [Nazwa] (encje: [...])
+  - Klaster 1.1: [Podtemat]
+  - Klaster 1.2: [Podtemat]
+- Filar 2: [Nazwa] (encje: [...])
+  - Klaster 2.1: [Podtemat]
 
-FORMAT WYJŚCIOWY (zagnieżdżona lista Markdown):
-- Filar 1: [Nazwa głównego obszaru tematycznego]
-  - Klaster 1.1: [Szczegółowy podtemat]
-  - Klaster 1.2: [Szczegółowy podtemat]
-- Filar 2: [Nazwa głównego obszaru tematycznego]
-  - Klaster 2.1: [Szczegółowy podtemat]
-  - Klaster 2.2: [Szczegółowy podtemat]
+Zwróć TYLKO strukturę Markdown, bez komentarzy.`;
 
-WAŻNE: Zwróć TYLKO strukturę w formacie Markdown, bez dodatkowych komentarzy, wprowadzeń czy wyjaśnień.`;
-
-    let stage1Result;
+    let result;
     try {
-      const stage1Response = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: stage1Prompt }] }],
+      const response = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
         tools: [{ url_context: {} }],
       });
 
-      stage1Result = stage1Response.response.text();
+      result = response.response.text();
     } catch (apiError) {
-      console.error('Błąd Stage 1 API:', apiError.message);
+      console.error('Błąd API:', apiError.message);
       console.error('Pełny błąd:', apiError);
 
       // Obsługa błędów autoryzacji
@@ -160,42 +157,12 @@ WAŻNE: Zwróć TYLKO strukturę w formacie Markdown, bez dodatkowych komentarzy
       };
     }
 
-    // ETAP 2: Synteza i ulepszanie
-    const stage2Prompt = `Jesteś strategiem contentu SEO. Otrzymałeś poniższą strukturę tematyczną, która została wyekstrahowana ze strony konkurenta:
-
-${stage1Result}
-
-Główny temat użytkownika to: "${sanitizedTopic}".
-
-Twoje zadania:
-1. Przeanalizuj otrzymaną strukturę i zidentyfikuj w niej ewentualne luki tematyczne lub obszary, które można znacząco rozbudować, aby stworzyć bardziej kompleksowe pokrycie tematu.
-2. Wygeneruj nową, ulepszoną i kompletną mapę tematyczną w formacie zagnieżdżonej listy Markdown.
-3. Przy najważniejszych filarach dodaj w nawiasie krótką sugestię dotyczącą kluczowych encji, które spajają dany temat.
-4. Upewnij się, że struktura jest logiczna, hierarchiczna i kompletna.
-
-Zwróć TYLKO strukturę w formacie Markdown, bez dodatkowych komentarzy czy wyjaśnień.`;
-
-    let stage2Result;
-    try {
-      const stage2Response = await model.generateContent(stage2Prompt);
-      stage2Result = stage2Response.response.text();
-    } catch (apiError) {
-      console.error('Błąd Stage 2 API:', apiError.message);
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          error: 'Błąd podczas generowania ulepszonej mapy tematycznej.'
-        }),
-      };
-    }
-
     // Zwracanie wyników
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        map: stage2Result,
+        map: result,
         success: true
       }),
     };
