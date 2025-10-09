@@ -93,41 +93,41 @@ exports.handler = async (event, context) => {
     const genAI = new GoogleGenerativeAI(sanitizedApiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
 
-    // ETAP 1: Dekonstrukcja konkurenta z groundingiem
-    const stage1Prompt = `Jesteś światowej klasy analitykiem SEO. Twoim zadaniem jest przeanalizowanie treści ze strony internetowej pod adresem: ${sanitizedUrl}
+    // ETAP 1: Dekonstrukcja konkurenta - prostszy prompt bez grounding
+    const stage1Prompt = `Jesteś światowej klasy analitykiem SEO i content strategiem.
 
-Zidentyfikuj i przedstaw w formie zagnieżdżonej listy Markdown główne filary tematyczne (pillars) oraz powiązane z nimi klastry (clusters). Skup się wyłącznie na semantycznej strukturze treści.
+ZADANIE: Stwórz kompleksową mapę tematyczną dla tematu: "${sanitizedTopic}".
 
-Przykład formatu wyjściowego:
-- Filar 1: Nazwa filaru
-  - Klaster 1.1: Szczegółowy podtemat
-  - Klaster 1.2: Szczegółowy podtemat
-- Filar 2: Nazwa filaru
-  - Klaster 2.1: Szczegółowy podtemat
-  - Klaster 2.2: Szczegółowy podtemat
+KONTEKST: Użytkownik analizuje konkurencję w tej niszy (przykładowa strona: ${sanitizedUrl}).
+Na podstawie Twojej wiedzy o tej tematyce oraz najlepszych praktykach w tej branży, stwórz strategiczną mapę tematyczną.
 
-Zwróć TYLKO strukturę w formacie Markdown, bez dodatkowych komentarzy.`;
+WYMAGANIA:
+1. Zidentyfikuj główne filary tematyczne (pillars) - 5-8 głównych obszarów tematycznych
+2. Dla każdego filaru zdefiniuj klastry (clusters) - szczegółowe podtematy (3-6 na filar)
+3. Struktura powinna być logiczna, hierarchiczna i wyczerpująca
+4. Skup się na semantycznych relacjach między tematami
+
+FORMAT WYJŚCIOWY (zagnieżdżona lista Markdown):
+- Filar 1: [Nazwa głównego obszaru tematycznego]
+  - Klaster 1.1: [Szczegółowy podtemat]
+  - Klaster 1.2: [Szczegółowy podtemat]
+  - Klaster 1.3: [Szczegółowy podtemat]
+- Filar 2: [Nazwa głównego obszaru tematycznego]
+  - Klaster 2.1: [Szczegółowy podtemat]
+  - Klaster 2.2: [Szczegółowy podtemat]
+
+WAŻNE: Zwróć TYLKO strukturę w formacie Markdown, bez dodatkowych komentarzy, wprowadzeń czy wyjaśnień.`;
 
     let stage1Result;
     try {
-      const stage1Response = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: stage1Prompt }] }],
-        tools: [{
-          googleSearchRetrieval: {
-            dynamicRetrievalConfig: {
-              mode: 'MODE_DYNAMIC',
-              dynamicThreshold: 0.3,
-            },
-          },
-        }],
-      });
-
+      const stage1Response = await model.generateContent(stage1Prompt);
       stage1Result = stage1Response.response.text();
     } catch (apiError) {
       console.error('Błąd Stage 1 API:', apiError.message);
+      console.error('Pełny błąd:', apiError);
 
       // Obsługa błędów autoryzacji
-      if (apiError.message.includes('API key') || apiError.message.includes('401')) {
+      if (apiError.message.includes('API key') || apiError.message.includes('401') || apiError.message.includes('API_KEY_INVALID')) {
         return {
           statusCode: 401,
           headers,
@@ -141,7 +141,7 @@ Zwróć TYLKO strukturę w formacie Markdown, bez dodatkowych komentarzy.`;
         statusCode: 500,
         headers,
         body: JSON.stringify({
-          error: 'Błąd podczas analizy strony konkurenta. Upewnij się, że URL jest publicznie dostępny.'
+          error: `Błąd podczas generowania mapy: ${apiError.message}`
         }),
       };
     }
