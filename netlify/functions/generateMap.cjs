@@ -91,27 +91,26 @@ exports.handler = async (event, context) => {
     // Inicjalizacja Google Generative AI
     // UWAGA: Klucz API jest używany TYLKO do tego zapytania i NIE jest nigdzie zapisywany
     const genAI = new GoogleGenerativeAI(sanitizedApiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
 
-    // ETAP 1: Dekonstrukcja konkurenta - prostszy prompt bez grounding
+    // ETAP 1: Dekonstrukcja konkurenta z URL Context
     const stage1Prompt = `Jesteś światowej klasy analitykiem SEO i content strategiem.
 
-ZADANIE: Stwórz kompleksową mapę tematyczną dla tematu: "${sanitizedTopic}".
+ZADANIE: Przeanalizuj strukturę treści ze strony ${sanitizedUrl} i wyekstrahuj z niej strategiczną mapę tematyczną.
 
-KONTEKST: Użytkownik analizuje konkurencję w tej niszy (przykładowa strona: ${sanitizedUrl}).
-Na podstawie Twojej wiedzy o tej tematyce oraz najlepszych praktykach w tej branży, stwórz strategiczną mapę tematyczną.
+GŁÓWNY TEMAT: "${sanitizedTopic}"
 
-WYMAGANIA:
-1. Zidentyfikuj główne filary tematyczne (pillars) - 5-8 głównych obszarów tematycznych
-2. Dla każdego filaru zdefiniuj klastry (clusters) - szczegółowe podtematy (3-6 na filar)
-3. Struktura powinna być logiczna, hierarchiczna i wyczerpująca
-4. Skup się na semantycznych relacjach między tematami
+WYMAGANIA ANALIZY:
+1. Przeanalizuj zawartość strony pod podanym URL
+2. Zidentyfikuj główne filary tematyczne (pillars) - kluczowe obszary tematyczne poruszane na stronie
+3. Dla każdego filaru wyodrębnij klastry (clusters) - szczegółowe podtematy
+4. Zachowaj hierarchię i strukturę logiczną
+5. Skup się na semantycznych relacjach między tematami
 
 FORMAT WYJŚCIOWY (zagnieżdżona lista Markdown):
 - Filar 1: [Nazwa głównego obszaru tematycznego]
   - Klaster 1.1: [Szczegółowy podtemat]
   - Klaster 1.2: [Szczegółowy podtemat]
-  - Klaster 1.3: [Szczegółowy podtemat]
 - Filar 2: [Nazwa głównego obszaru tematycznego]
   - Klaster 2.1: [Szczegółowy podtemat]
   - Klaster 2.2: [Szczegółowy podtemat]
@@ -120,7 +119,11 @@ WAŻNE: Zwróć TYLKO strukturę w formacie Markdown, bez dodatkowych komentarzy
 
     let stage1Result;
     try {
-      const stage1Response = await model.generateContent(stage1Prompt);
+      const stage1Response = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: stage1Prompt }] }],
+        tools: [{ url_context: {} }],
+      });
+
       stage1Result = stage1Response.response.text();
     } catch (apiError) {
       console.error('Błąd Stage 1 API:', apiError.message);
@@ -133,6 +136,17 @@ WAŻNE: Zwróć TYLKO strukturę w formacie Markdown, bez dodatkowych komentarzy
           headers,
           body: JSON.stringify({
             error: 'Nieprawidłowy klucz API Google. Sprawdź swój klucz i spróbuj ponownie.'
+          }),
+        };
+      }
+
+      // Obsługa błędu modelu
+      if (apiError.message.includes('not found') || apiError.message.includes('404')) {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({
+            error: 'Model Gemini 2.5 Pro nie jest dostępny. Sprawdź czy masz dostęp do tego modelu.'
           }),
         };
       }
