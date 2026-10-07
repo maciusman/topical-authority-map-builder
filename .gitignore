@@ -39,3 +39,7 @@ build
 
 # OS files
 Thumbs.db
+
+# Sekrety i pliki lokalne
+.claude/settings.local.json
+deploy.tar.gz

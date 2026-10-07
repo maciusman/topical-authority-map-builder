@@ -40,8 +40,9 @@ if (-not $netlifyInstalled) {
     npm install -g netlify-cli
 }
 
-# Utwórz plik konfiguracyjny Netlify z tokenem
-$env:NETLIFY_AUTH_TOKEN = "nfp_ZSd6idHCZfjCh6k3g3bzcjjtqG45wqPj15cf"
+# Token NIE jest wpisany w plik. Netlify CLI bierze go ze zmiennej NETLIFY_AUTH_TOKEN
+# (ustaw raz: [Environment]::SetEnvironmentVariable("NETLIFY_AUTH_TOKEN","<token>","User"))
+# albo z logowania: netlify login
 
 Write-Host "Tworzenie strony na Netlify..." -ForegroundColor Yellow
 
